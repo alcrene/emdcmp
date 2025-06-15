@@ -307,7 +307,6 @@ def compute_Bemd(i_ω_c: Tuple[int, Experiment, float],
 
     """
     ## Unpack arg 1 ##  (pool.imap requires iterating over one argument only)
-    # i, data_model, candidate_model_A, candidate_model_B, QA, QB, c = datamodel_risk_c
     i, ω, c = i_ω_c
 
     ## Generate observed data ##
@@ -352,7 +351,6 @@ def compute_Bemd(i_ω_c: Tuple[int, Experiment, float],
 
     ## Return alongside the experiment key
     return (i, ω, c), Bemd
-    # return (i, data_model, QA, QB, c), Bemd
 
 
 # %% editable=true slideshow={"slide_type": ""}
@@ -405,10 +403,8 @@ def compute_Bemd_and_maybe_Bepis(i_ω_c, Ldata, Linf, c_conf):
     #     were a bottleneck with imap, it should not exceed memory:
     #     i, c, Bemd and Bepis are all small scalars.
     (i, ω, c), Bemd = compute_Bemd(i_ω_c, Ldata)
-    if c == c_conf:
-        Bepis = compute_Bepis(ω.data_model, ω.QA, ω.QB, Linf)
-    else:
-        Bepis = None
+    Bepis = compute_Bepis(ω.data_model, ω.QA, ω.QB, Linf) if c == c_conf \
+            else None
     return i, c, Bemd, Bepis
 
 
@@ -422,14 +418,7 @@ class Calibrate:
     def __call__(
         self,
         c_list     : List[float],
-        #data_models: Sequence[DataModel],
         experiments: Dataclass,   # Iterable of Experiment elements
-        #riskA     : RiskFunction
-        # riskA      : Union[Dataclass,PureFunction],
-        # riskB      : Union[Dataclass,PureFunction],
-        #synth_risk_ppf: SynthPPF
-        #synth_risk_ppfA  : Union[emd.interp1d, PureFunction],
-        #synth_risk_ppfB  : Union[emd.interp1d, PureFunction],
         Ldata      : int,
         Linf       : int,
         ) -> CalibrateOutput:
@@ -472,7 +461,7 @@ class Calibrate:
 # %% [markdown] editable=true slideshow={"slide_type": ""}
 # #### Prepare the runs
 #
-# Bind arguments to the `Bemd` function, so it only take one argument (`datamodel_c`) as required by `imap`.
+# Bind arguments to the `Bemd` function, so it only takes one argument (`i_ω_c`) as required by `imap`.
 
         # %% editable=true slideshow={"slide_type": ""} tags=["skip-execution"]
         # compute_Bemd_partial = partial(compute_Bemd, Ldata=Ldata)
@@ -509,8 +498,8 @@ class Calibrate:
 
         # %% editable=true slideshow={"slide_type": ""} tags=["skip-execution"]
         ω_c_gen = ((i, ω, c)  # i is used as an id for each different model/Qs set
-                        for i, ω in enumerate(experiments)
-                        for c in c_list)
+                   for i, ω in enumerate(experiments)
+                   for c in c_list)
 
         if ncores > 1:
             with mp.Pool(ncores, maxtasksperchild=config.mp.maxtasksperchild) as pool:
@@ -526,13 +515,6 @@ class Calibrate:
                     Bemd_results[i, c] = Bemd
                     if Bepis is not None:
                         Bepis_results[i] = Bepis
-                # Bemd_it = pool.imap(compute_Bemd_partial, ω_c_gen,
-                #                     chunksize=chunksize)
-                # for (i, data_model, QA, QB, c), Bemd_res in Bemd_it:
-                #     progbar.update(1)        # Updating first more reliable w/ ssh
-                #     Bemd_results[i, c] = Bemd_res
-                #     if i not in Bepis_results:
-                #         Bepis_results[i] = compute_Bepis(data_model, QA, QB, Linf)
 
 # %% [markdown] editable=true slideshow={"slide_type": ""}
 # Variant without multiprocessing:
@@ -545,12 +527,6 @@ class Calibrate:
                 Bemd_results[i, c] = Bemd
                 if Bepis is not None:
                     Bepis_results[i] = Bepis
-            # Bemd_it = (compute_Bemd_partial(arg) for arg in ω_c_gen)
-            # for (i, data_model, QA, QB, c), Bemd_res in Bemd_it:
-            #     progbar.update(1)        # Updating first more reliable w/ ssh
-            #     Bemd_results[i, c] = Bemd_res
-            #     if i not in Bepis_results:
-            #         Bepis_results[i] = compute_Bepis(data_model, QA, QB, Linf)
 
 # %% [markdown] editable=true slideshow={"slide_type": ""}
 # #### Cleanup
@@ -589,6 +565,7 @@ class Calibrate:
         """
         assert len(result.Bemd) == len(self.c_list) * len(result.Bepis), \
             "`result` argument seems not to have been created with this task."
+
         # Reconstruct the dictionary as it was at the end of task execution
         Bemd_dict = {}; Bemd_it = iter(result.Bemd)
         Bepis_dict = {}; Bepis_it = iter(result.Bepis)
@@ -596,16 +573,12 @@ class Calibrate:
             Bepis_dict[i] = next(Bepis_it)         # => we just use integer ids
             for c in self.taskinputs.c_list:       # This avoids unnecessarily
                 Bemd_dict[i, c] = next(Bemd_it)  # instantiating models.
-        # for data_model in self.taskinputs.models:
-        #     Bepis_dict[data_model] = next(Bepis_it)
-        #     for c in self.taskinputs.c_list:
-        #         Bemd_dict[(data_model, c)] = next(Bemd_it)
-        # Package results into a record arrays – easier to sort and plot
+
+        # Package results into record arrays – easier to sort and plot
         calib_curve_data = {c: [] for c in self.taskinputs.c_list}
         for i, c in Bemd_dict:
             calib_curve_data[c].append(
                 (Bemd_dict[i, c], Bepis_dict[i]) )
 
-        #return UnpackedCalibrateResult(Bemd=Bemd_dict, Bepis=Bepis_dict)
         return {c: np.array(calib_curve_data[c], dtype=calib_point_dtype)
                 for c in self.taskinputs.c_list}
