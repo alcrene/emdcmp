@@ -98,7 +98,7 @@ sphinx:
           "Me"    : "\\mathcal{M}^ε"
           "Philt" : ["\\widetilde{Φ}_{|#1}", 1]
           "Bemd"  : ["B_{#1}^{\\mathrm{EMD}}", 1]
-          "Bconf" : ["B^{\\mathrm{conf}}_{#1}", 1]
+          "Bepis" : ["B^{\\mathrm{epis}}_{#1}", 1]
           # path_sampling.md
           "lnLtt": "{q^*}"
           "Mvar" : "{\\mathop{\\mathrm{Mvar}}}"

@@ -134,25 +134,25 @@ def calibration_plot(calib_results: CalibrateResult,
     calib_curves = {}
     calib_bins = {}
     for c, data in calib_results.items():
-        # # We don’t do the following because it uses the Bconf data to break ties.
+        # # We don’t do the following because it uses the Bepis data to break ties.
         # # If there are a lot equal values (typically happens with a too small c),
         # # then those will get sorted and we get an artificial jump from 0 to 1
         # data.sort(order="Bemd")
         σ = np.argsort(data["Bemd"])  # This will only use Bemd data; order within ties remains random
         Bemd = data["Bemd"][σ]    # NB: Don’t modify original data order: 
-        Bconf = data["Bconf"][σ]  #     we may want to inspect it later.
+        Bepis = data["Bepis"][σ]  #     we may want to inspect it later.
 
         curve_data = []
         bin_idcs = []
         i = 0
         for w in utils.get_bin_sizes(len(data), target_bin_size):
             curve_data.append((Bemd[i:i+w].mean(),
-                               Bconf[i:i+w].mean()))
+                               Bepis[i:i+w].mean()))
             bin_idcs.append(σ[i:i+w])
             i += w
 
-        curve = hv.Curve(curve_data, kdims="Bemd", vdims="Bconf", label=f"{c=}")
-        curve = curve.redim.range(Bemd=(0,1), Bconf=(0,1))
+        curve = hv.Curve(curve_data, kdims="Bemd", vdims="Bepis", label=f"{c=}")
+        curve = curve.redim.range(Bemd=(0,1), Bepis=(0,1))
         curve.opts(hv.opts.Curve(**config.viz.calibration_curves))
         calib_curves[c] = curve
         calib_bins[c] = bin_idcs
@@ -162,20 +162,20 @@ def calibration_plot(calib_results: CalibrateResult,
     ## Prohibited & discouraged areas ##
     # Prohibited area
     prohibited_areas = hv.Area([(x, x, 1-x) for x in np.linspace(0, 1, 32)],
-                              kdims=["Bemd"], vdims=["Bconf", "Bconf2"],
+                              kdims=["Bemd"], vdims=["Bepis", "Bepis2"],
                               group="overconfident area")
 
     # Discouraged areas
     discouraged_area_1 = hv.Area([(x, 1-x, 1) for x in np.linspace(0, 0.5, 16)],
-                         kdims=["Bemd"], vdims=["Bconf", "Bconf2"],
+                         kdims=["Bemd"], vdims=["Bepis", "Bepis2"],
                          group="undershoot area")
     discouraged_area_2 = hv.Area([(x, 0, 1-x) for x in np.linspace(0.5, 1, 16)],
-                         kdims=["Bemd"], vdims=["Bconf", "Bconf2"],
+                         kdims=["Bemd"], vdims=["Bepis", "Bepis2"],
                          group="undershoot area")
 
-    prohibited_areas = prohibited_areas.redim.range(Bemd=(0,1), Bconf=(0,1))
-    discouraged_area_1 = discouraged_area_1.redim.range(Bemd=(0,1), Bconf=(0,1))
-    discouraged_area_2 = discouraged_area_2.redim.range(Bemd=(0,1), Bconf=(0,1))
+    prohibited_areas = prohibited_areas.redim.range(Bemd=(0,1), Bepis=(0,1))
+    discouraged_area_1 = discouraged_area_1.redim.range(Bemd=(0,1), Bepis=(0,1))
+    discouraged_area_2 = discouraged_area_2.redim.range(Bemd=(0,1), Bepis=(0,1))
 
     prohibited_areas.opts(hv.opts.Area(**config.viz.prohibited_area))
     discouraged_area_1.opts(hv.opts.Area(**config.viz.discouraged_area))

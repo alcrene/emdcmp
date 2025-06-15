@@ -17,7 +17,7 @@
 # %% [markdown] tags=["remove-cell"] editable=true slideshow={"slide_type": ""}
 # ---
 # math:
-#   '\Bconf' : 'B^{\mathrm{epis}}_{#1}'
+#   '\Bepis' : 'B^{\mathrm{epis}}_{#1}'
 #   '\Bemd'  : 'B_{#1}^{\mathrm{EMD}}'
 # ---
 
@@ -147,7 +147,7 @@ class EpistemicDist(abc.ABC):
 # | `c_list` | The values of $c$ we want to test. |
 # | `models` | Sequence of $N$ quintuplets of models (data generation, candidate A, candidate B, loss A, loss B) drawn from a calibration distribution. Typically, but not necessarily, a subclass of `EpistemicDist`: any dataclass satisfying the requirements listed in `EpistemicDist` is accepted. |
 # | `Ldata` | Data set size used to construct the empirical PPF for models $A$ and $B$. Ideally commensurate with the actual data set used to assess models. |
-# | `Linf` | Data set size considered equivalent to "infinite". Used to compute $\Bconf{}$ |
+# | `Linf` | Data set size considered equivalent to "infinite". Used to compute $\Bepis{}$ |
 #
 # The value of $N$ is determined from `len(models)`, so the `models` iterable should define its length.
 #
@@ -242,17 +242,17 @@ RiskFunction = Callable[[Dataset], np.ndarray]
 # #### Result type
 
 # %% [markdown] editable=true slideshow={"slide_type": ""}
-# Calibration results are returned as a [record array](https://numpy.org/doc/stable/user/basics.rec.html#record-arrays) with fields `Bemd` and `Bconf`. Each row in the array corresponds to one data model, and there is one array per $c$ value. So a `CalibrateResult` object is a dictionary which looks something like the following:
+# Calibration results are returned as a [record array](https://numpy.org/doc/stable/user/basics.rec.html#record-arrays) with fields `Bemd` and `Bepis`. Each row in the array corresponds to one data model, and there is one array per $c$ value. So a `CalibrateResult` object is a dictionary which looks something like the following:
 
 # %% [markdown] editable=true slideshow={"slide_type": ""}
 # ```{math}
 # \begin{alignedat}{4}  % Would be nicer with nested {array}, but KaTeX doesn’t support vertical alignment
-# &\texttt{CalibrateResult}:\qquad & \{ c_1: &\qquad&  \texttt{Bemd} &\quad& \texttt{Bconf} \\
+# &\texttt{CalibrateResult}:\qquad & \{ c_1: &\qquad&  \texttt{Bemd} &\quad& \texttt{Bepis} \\
 #   &&&&  0.24    && 0 \\
 #   &&&&  0.35    && 1 \\
 #   &&&&  0.37    && 0 \\
 #   &&&&  0.51    && 1 \\
-#   && c_2: &\qquad&  \texttt{Bemd} &\quad& \texttt{Bconf} \\
+#   && c_2: &\qquad&  \texttt{Bemd} &\quad& \texttt{Bepis} \\
 #   &&&&  0.11    && 0 \\
 #   &&&&  0.14    && 0 \\
 #   &&&&  0.22    && 0 \\
@@ -263,7 +263,7 @@ RiskFunction = Callable[[Dataset], np.ndarray]
 # ```
 
 # %% editable=true slideshow={"slide_type": ""}
-calib_point_dtype = np.dtype([("Bemd", float), ("Bconf", bool)])
+calib_point_dtype = np.dtype([("Bemd", float), ("Bepis", bool)])
 CalibrateResult = dict[float, np.ndarray[calib_point_dtype]]
 
 
@@ -273,14 +273,14 @@ class CalibrateOutput(TaskOutput):
     Use `task.unpack_result` to convert to a `CalibrateResult` object.
     """
     Bemd : List[float]
-    Bconf: List[float]
+    Bepis: List[float]
 
 
 # %% [markdown] editable=true slideshow={"slide_type": ""}
 # ### Functions for the calibration experiment
 
 # %% [markdown] editable=true slideshow={"slide_type": ""}
-# Below we define the two functions to compute $\Bemd{}$ and $\Bconf{}$; these will be the abscissa and ordinate in the calibration plot.
+# Below we define the two functions to compute $\Bemd{}$ and $\Bepis{}$; these will be the abscissa and ordinate in the calibration plot.
 # Both functions take an arguments a data generation model, risk functions for candidate models $A$ and $B$, and a number of data points to generate.
 #
 # - $\Bemd{}$ needs to be recomputed for each value of $c$, so we also pass $c$ as a parameter. $\Bemd{}$ computations are relatively expensive, and there are a lot of them to do during calibration, so we want to dispatch `compute_Bemd` to different multiprocessing (MP) processes. This has two consequences:
@@ -288,7 +288,7 @@ class CalibrateOutput(TaskOutput):
 #   - The `multiprocessing.Pool.imap` function we use to dispatch function calls can only iterate over one argument. To accomodate this, we combine the data model and $c$ value into a tuple `datamodel_c`, which is unpacked within the `compute_Bemd` function.
 #   - All arguments should be pickleable, as pickle is used to send data to subprocesses.
 #
-# - $\Bconf{}$ only needs to be computed once per data model. $\Bconf{}$ is also typically cheap (unless the data generation model is very complicated), so it is not worth dispatching to an MP subprocess.
+# - $\Bepis{}$ only needs to be computed once per data model. $\Bepis{}$ is also typically cheap (unless the data generation model is very complicated), so it is not worth dispatching to an MP subprocess.
 
 # %% editable=true slideshow={"slide_type": ""}
 def compute_Bemd(i_ω_c: Tuple[int, Experiment, float],
@@ -356,46 +356,46 @@ def compute_Bemd(i_ω_c: Tuple[int, Experiment, float],
 
 
 # %% editable=true slideshow={"slide_type": ""}
-def compute_Bconf(data_model, QA, QB, Linf):
-    """Compute the true Bconf (using a quasi infinite number of samples)"""
+def compute_Bepis(data_model, QA, QB, Linf):
+    """Compute the true Bepis (using a quasi infinite number of samples)"""
     
     # Generate samples
-    logger.debug(f"Compute Bconf – Generating 'infinite' dataset with {Linf} data points"); t1 = time.perf_counter()
+    logger.debug(f"Compute Bepis – Generating 'infinite' dataset with {Linf} data points"); t1 = time.perf_counter()
     data = data_model(Linf)
     t2 = time.perf_counter()
-    logger.debug(f"Compute Bconf – Done generating 'infinite' dataset. Took {t2-t1:.2f} s")
+    logger.debug(f"Compute Bepis – Done generating 'infinite' dataset. Took {t2-t1:.2f} s")
     
-    # Compute Bconf
-    logger.debug("Compute Bconf – Evaluating expected risk on 'infinite' dataset"); t1 = time.perf_counter()
+    # Compute Bepis
+    logger.debug("Compute Bepis – Evaluating expected risk on 'infinite' dataset"); t1 = time.perf_counter()
     RA = QA(data).mean()
     RB = QB(data).mean()
     t2 = time.perf_counter()
-    logger.debug(f"Compute Bconf – Done evaluating risk. Took {t2-t1:.2f} s")
+    logger.debug(f"Compute Bepis – Done evaluating risk. Took {t2-t1:.2f} s")
     return RA < RB
 
 
 # %% editable=true slideshow={"slide_type": ""}
-def compute_Bemd_and_maybe_Bconf(i_ω_c, Ldata, Linf, c_conf):
-    """Wrapper which calls both `compute_Bemd` and `compute_Bconf`.
+def compute_Bemd_and_maybe_Bepis(i_ω_c, Ldata, Linf, c_conf):
+    """Wrapper which calls both `compute_Bemd` and `compute_Bepis`.
     The latter is only called if `c` matches `c_conf`. 
     
     The reason for this wrapper is to better utilize multiprocessing threads,
-    by executing Bconf with the same MP threads as Bemd while still ensuring
-    that Bconf is not executed more often than needed.
+    by executing Bepis with the same MP threads as Bemd while still ensuring
+    that Bepis is not executed more often than needed.
     Since Bemd is executed once for every `c` value in `c_list`, we choose
     one value in `c_list` and make that special: whenever we compute Bemd for
-    that `c`, we also compute Bconf.
+    that `c`, we also compute Bepis.
 
     This has three related benefits:
     - If there is caching that might reuse computations between compute_Bemd
-      and compute_Bconf (e.g. a data generation function decorated with @cache),
+      and compute_Bepis (e.g. a data generation function decorated with @cache),
       this increases the chances 
-    - It avoids having to execute Bconf in the main process, which can have
-      adverse effects if Bconf involves significant computation. If we have
+    - It avoids having to execute Bepis in the main process, which can have
+      adverse effects if Bepis involves significant computation. If we have
       n cores and n MP processes, then having computation occuring in the main
       process is like having n+1 MP processes, which will lead to inefficient
       switching.
-    - If the Bconf computations are so significant (less than n times faster
+    - If the Bepis computations are so significant (less than n times faster
       than Bemd), then they become a bottleneck and cause `imap` to accumulate
       a queue of results. Since this is effectively an unbounded cache, if
       those results require substantial memory, this can cause the entire
@@ -403,13 +403,13 @@ def compute_Bemd_and_maybe_Bconf(i_ω_c, Ldata, Linf, c_conf):
     """
     # NB: Since `data_model` is consumed within this function, even if there
     #     were a bottleneck with imap, it should not exceed memory:
-    #     i, c, Bemd and Bconf are all small scalars.
+    #     i, c, Bemd and Bepis are all small scalars.
     (i, ω, c), Bemd = compute_Bemd(i_ω_c, Ldata)
     if c == c_conf:
-        Bconf = compute_Bconf(ω.data_model, ω.QA, ω.QB, Linf)
+        Bepis = compute_Bepis(ω.data_model, ω.QA, ω.QB, Linf)
     else:
-        Bconf = None
-    return i, c, Bemd, Bconf
+        Bepis = None
+    return i, c, Bemd, Bepis
 
 
 # %% [markdown] editable=true slideshow={"slide_type": ""}
@@ -448,16 +448,16 @@ class Calibrate:
             Therefore also an iterable of data models to use for calibration;
             when iterating, each element should be compatible with `Experiment` type.
             See `EpistemicDist` for more details.
-            Each experiment will result in one (Bconf, Bemd) pair in the output results.
+            Each experiment will result in one (Bepis, Bemd) pair in the output results.
             If this iterable is sized, progress bars will estimate the remaining compute time.
         
         Ldata: Number of data points from the true model to generate when computing Bemd.
             This should be chosen commensurate with the size of the dataset that will be analyzed,
             in order to accurately mimic data variability.
-        Linf: Number of data points from the true model to generate when computing `Bconf`.
+        Linf: Number of data points from the true model to generate when computing `Bepis`.
             This is to emulate an infinitely large data set, and so should be large
             enough that numerical variability is completely suppressed.
-            Choosing a too small value for `Linf` will add noise to the Bconf estimate,
+            Choosing a too small value for `Linf` will add noise to the Bepis estimate,
             which would need to compensated by more calibration experiments.
             Since generating more samples is generally cheaper than performing more
             experiments, it is also generally preferable to choose rather large `Linf`
@@ -476,7 +476,7 @@ class Calibrate:
 
         # %% editable=true slideshow={"slide_type": ""} tags=["skip-execution"]
         # compute_Bemd_partial = partial(compute_Bemd, Ldata=Ldata)
-        compute_partial = partial(compute_Bemd_and_maybe_Bconf,
+        compute_partial = partial(compute_Bemd_and_maybe_Bepis,
                                   Ldata=Ldata, Linf=Linf, c_conf=c_list[0])
 
 # %% [markdown]
@@ -484,7 +484,7 @@ class Calibrate:
 
         # %% editable=true slideshow={"slide_type": ""} tags=["skip-execution"]
         Bemd_results = {}
-        Bconf_results = {}
+        Bepis_results = {}
 
 # %% [markdown]
 # - Set the iterator over parameter combinations (we need two identical ones)
@@ -519,38 +519,38 @@ class Calibrate:
                 chunksize, extra = divmod(N, ncores*6)
                 if extra:
                     chunksize += 1
-                Bemd_Bconf_it = pool.imap_unordered(compute_partial, ω_c_gen,
+                Bemd_Bepis_it = pool.imap_unordered(compute_partial, ω_c_gen,
                                                     chunksize=chunksize)
-                for (i, c, Bemd, Bconf) in Bemd_Bconf_it:
+                for (i, c, Bemd, Bepis) in Bemd_Bepis_it:
                     progbar.update(1)        # Updating first more reliable w/ ssh
                     Bemd_results[i, c] = Bemd
-                    if Bconf is not None:
-                        Bconf_results[i] = Bconf
+                    if Bepis is not None:
+                        Bepis_results[i] = Bepis
                 # Bemd_it = pool.imap(compute_Bemd_partial, ω_c_gen,
                 #                     chunksize=chunksize)
                 # for (i, data_model, QA, QB, c), Bemd_res in Bemd_it:
                 #     progbar.update(1)        # Updating first more reliable w/ ssh
                 #     Bemd_results[i, c] = Bemd_res
-                #     if i not in Bconf_results:
-                #         Bconf_results[i] = compute_Bconf(data_model, QA, QB, Linf)
+                #     if i not in Bepis_results:
+                #         Bepis_results[i] = compute_Bepis(data_model, QA, QB, Linf)
 
 # %% [markdown] editable=true slideshow={"slide_type": ""}
 # Variant without multiprocessing:
 
         # %% editable=true slideshow={"slide_type": ""}
         else:
-            Bemd_Bconf_it = (compute_partial(arg) for arg in ω_c_gen)
-            for (i, c, Bemd, Bconf) in Bemd_Bconf_it:
+            Bemd_Bepis_it = (compute_partial(arg) for arg in ω_c_gen)
+            for (i, c, Bemd, Bepis) in Bemd_Bepis_it:
                 progbar.update(1)
                 Bemd_results[i, c] = Bemd
-                if Bconf is not None:
-                    Bconf_results[i] = Bconf
+                if Bepis is not None:
+                    Bepis_results[i] = Bepis
             # Bemd_it = (compute_Bemd_partial(arg) for arg in ω_c_gen)
             # for (i, data_model, QA, QB, c), Bemd_res in Bemd_it:
             #     progbar.update(1)        # Updating first more reliable w/ ssh
             #     Bemd_results[i, c] = Bemd_res
-            #     if i not in Bconf_results:
-            #         Bconf_results[i] = compute_Bconf(data_model, QA, QB, Linf)
+            #     if i not in Bepis_results:
+            #         Bepis_results[i] = compute_Bepis(data_model, QA, QB, Linf)
 
 # %% [markdown] editable=true slideshow={"slide_type": ""}
 # #### Cleanup
@@ -574,7 +574,7 @@ class Calibrate:
         # %% editable=true slideshow={"slide_type": ""} tags=["skip-execution", "remove-cell"]
         # NB: Don’t just use list(Bemd_results.values()): order of dictionary is not guaranteed
         return dict(Bemd =[Bemd_results [i,c] for i in range(len(experiments)) for c in c_list],
-                    Bconf=[Bconf_results[i]   for i in range(len(experiments))])
+                    Bepis=[Bepis_results[i]   for i in range(len(experiments))])
 
 # %% [markdown] tags=["remove-cell"] editable=true slideshow={"slide_type": ""}
 # > **END OF `Calibrate.__call__`**
@@ -587,25 +587,25 @@ class Calibrate:
         dictionary structure of a `CalibrateResult`, where experiments are
         organized by their value of `c`.
         """
-        assert len(result.Bemd) == len(self.c_list) * len(result.Bconf), \
+        assert len(result.Bemd) == len(self.c_list) * len(result.Bepis), \
             "`result` argument seems not to have been created with this task."
         # Reconstruct the dictionary as it was at the end of task execution
         Bemd_dict = {}; Bemd_it = iter(result.Bemd)
-        Bconf_dict = {}; Bconf_it = iter(result.Bconf)
-        for i in range(len(result.Bconf)):         # We don’t actually need the models
-            Bconf_dict[i] = next(Bconf_it)         # => we just use integer ids
+        Bepis_dict = {}; Bepis_it = iter(result.Bepis)
+        for i in range(len(result.Bepis)):         # We don’t actually need the models
+            Bepis_dict[i] = next(Bepis_it)         # => we just use integer ids
             for c in self.taskinputs.c_list:       # This avoids unnecessarily
                 Bemd_dict[i, c] = next(Bemd_it)  # instantiating models.
         # for data_model in self.taskinputs.models:
-        #     Bconf_dict[data_model] = next(Bconf_it)
+        #     Bepis_dict[data_model] = next(Bepis_it)
         #     for c in self.taskinputs.c_list:
         #         Bemd_dict[(data_model, c)] = next(Bemd_it)
         # Package results into a record arrays – easier to sort and plot
         calib_curve_data = {c: [] for c in self.taskinputs.c_list}
         for i, c in Bemd_dict:
             calib_curve_data[c].append(
-                (Bemd_dict[i, c], Bconf_dict[i]) )
+                (Bemd_dict[i, c], Bepis_dict[i]) )
 
-        #return UnpackedCalibrateResult(Bemd=Bemd_dict, Bconf=Bconf_dict)
+        #return UnpackedCalibrateResult(Bemd=Bemd_dict, Bepis=Bepis_dict)
         return {c: np.array(calib_curve_data[c], dtype=calib_point_dtype)
                 for c in self.taskinputs.c_list}
