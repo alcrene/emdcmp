@@ -26,7 +26,7 @@ import holoviews as hv
 
 # %%
 from dataclasses import dataclass
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 
 # %% editable=true raw_mimetype="" slideshow={"slide_type": ""} tags=["skip-execution"]
 from .config import config
@@ -47,22 +47,176 @@ dash_patterns = ["dotted", "dashed", "solid"]
 @dataclass
 class CalibrationPlotElements:
     """
-    `bin_idcs`: Dictionary indicating which experiment index were assigned to
-       each bin. Use in conjunction with the EpistemicDistribution iterator
-       to reconstruct specific experiments.
+    This object contains summarized data from a calibration experiment, and
+    allows to plot it in various forms.
+    While it already renders itself graphically as a configuration curve
+    with default paramaters, it also provides various options to customize
+    the display.
+
+    For plotting calibration curves, use one of the following properties:
+
+    - ``scatters``
+    - ``lines``
+    - ``overlayed_scatters``
+    - ``overlayed_lines``
+
+    The first two return multiple curves (indexed by their *c* value) as a
+    `hv.HoloMap`, whereas the latter two combine them into one figure with
+    `hv.Overlay`.
+
+    All of these combine three plot elements into an Overlay plot.
+    If you want full contral, you can also be retrieve them individually:
+
+    - ``calibration_curves``
+    - ``prohibited_areas``
+    - ``discouraged_areas``
+
+    Generally the `scatters` plots are recommended, as they better show how
+    the bins are distributed, although `lines` can work better for busy plots.
+
+    An alternative way of visualizing how bins are distributed is to plot
+    them as histograms with one of:
+
+    - ``Bemd_hists``
+    - ``Bepis_hists``
+
+    Since this returns Holoviews plots, the visual style can be adjusted post-hoc
+    with the `.opts` method on the returned plot object.
+    Alternatively, you may subclass this dataclass and override one or more
+    of its plot options methods:
+
+    - ``opts``
+    - ``scatter_opts``
+    - ``hist_opts``
+
+    Converting a plain CalibPlotElements dataclass to your customized type
+    should be as simple as ``MyCalibPlot(old_calib_plot)``.
+
+    Finally, in some cases you may want to reconstruct which experiments were
+    assigned to each bin. This can be done with
+
+    - ``experiment_idcs``
+
+    This is a dictionary in the form ``{c: [Array[experiment idx]]]}``.
+    It maps each *c* value to a list of arrays, each array containing all
+    experiment indices combined into one Bemd bin.
+    By re-running the EpistemicDist generator and matching experiment indices,
+    it is possible to reconstruct the parameters of each experiment which
+    landed in a given bin.
     """
-    calibration_curves: hv.Overlay
+    calibration_curves: hv.HoloMap
     prohibited_areas   : hv.Area
     discouraged_areas : hv.Overlay
-    bin_idcs: Dict[float,List[np.ndarray[int]]]
+    Bemd_hist_data:  Dict[float,Tuple[np.ndarray[int], np.ndarray[float]]]
+    Bepis_hist_data: Dict[float,Tuple[np.ndarray[int], np.ndarray[float]]]
+    experiment_idcs: Dict[float,List[np.ndarray[int]]]
 
-    def __iter__(self):
-        yield self.calibration_curves
-        yield self.prohibited_areas
-        yield self.discouraged_areas
+    ## Plotting functions ##
+
+    @property
+    def opts(self):
+        return (
+            hv.opts.Curve(**config.viz.calibration_curves),
+            hv.opts.Area("Overconfident_area", **config.viz.prohibited_area),
+            hv.opts.Area("Undershoot_area", **config.viz.discouraged_area)
+            )
+    @property
+    def scatter_opts(self):
+        scatter_opts = [hv.opts.Curve(color="#888888"),
+                        hv.opts.Scatter(color=config.viz.calibration_curves["color"])
+                        ]
+        if "matplotlib" in hv.Store.renderers:
+            scatter_opts += [hv.opts.Curve(linestyle="dotted", linewidth=1, backend="matplotlib"),
+                             hv.opts.Scatter(s=10, backend="matplotlib")]
+        if "bokeh" in hv.Store.renderers:
+            scatter_opts += [hv.opts.Curve(line_dash="dotted", line_width=1, backend="bokeh")]
+        return scatter_opts
+    @property
+    def hist_opts(self):
+        hist_opts = []
+        if "matplotlib" in hv.Store.renderers:
+            hist_opts.append(
+                hv.opts.Histogram(backend="bokeh",
+                    line_color=None, alpha=0.75,
+                    color=config.viz.calibration_curves["color"])
+                )
+        if "bokeh" in hv.Store.renderers:
+            hist_opts.append(
+                hv.opts.Histogram(backend="matplotlib",
+                    color="none", edgecolor="none", alpha=0.75,
+                    facecolor=config.viz.calibration_curves["color"])
+                )
+        return hist_opts
+
+    @property
+    def lines(self) -> hv.HoloMap:
+        """
+        Plot the calibration curves as solid lines joining the (Bemd, Bepis) tuples.
+        """
+        # We use .clone() to prevent contamination with different view options
+        # It must be applied to the Curves themselves; cloning their containing HoloMap is not sufficient
+        return hv.HoloMap({c: self.prohibited_areas * self.discouraged_areas
+                              * curve.clone()
+                           for c, curve in self.calibration_curves.items()}
+               ).opts(*self.opts)
+
+    @property
+    def overlayed_lines(self) -> hv.Overlay:
+        """
+        Plot the calibration curves as solid lines joining the (Bemd, Bepis) tuples.
+        """
+        # We use .clone() to prevent contamination with different view options
+        # It must be applied to the Curves themselves; cloning their containing HoloMap is not sufficient
+        return (self.prohibited_areas * self.discouraged_areas
+                * hv.Overlay([curve.clone() for curve in self.calibration_curves])
+               ).opts(*self.opts)
+
+
+    @property
+    def scatters(self) -> hv.HoloMap:
+        """
+        Plot the calibration (Bemd, Bepis) tuples as a scatter plot.
+        Points are joined with grey dotted lines to allow to make it easier to
+        see which points come from the same `c` value and what curve they form.
+
+        When possible, this should be the preferred way of reporting calibration
+        curves: by showing where the bins fall, it is much easier to identify
+        an excess concentration of points on the edge.
+        With many curves however, they are easier to differentiate with the
+        solid `lines` format.
+        """
+        scatters = {c: curve.to.scatter() for c, curve in self.calibration_curves.items()}
+        return hv.HoloMap({c: self.prohibited_areas * self.discouraged_areas
+                              * self.calibration_curves[c].clone() * scatters[c]
+                           for c in scatters},
+                          kdims=["c"]
+               ).opts(*self.opts).opts(scatter_opts)
+    @property
+    def overlayed_scatters(self) -> hv.Overlay:
+        """
+        Same as `scatters`, except all curve+scatter plots are overlayed
+        into one figure.
+        """
+        scatters = {c: curve.to.scatter() for c, curve in self.calibration_curves.items()}
+        return (self.prohibited_areas * self.discouraged_areas
+                * hv.Overlay([curve.clone() for curve in self.calibration_curves.values()])
+                * hv.Overlay(list(scatters.values()))
+                ).opts(*self.opts).opts(scatter_opts)
+
+    @property
+    def Bemd_hists(self) -> hv.HoloMap:
+        frames = {c: hv.Histogram(data, kdims=["Bemd"], label="Bemd")
+                  for c, data in self.Bemd_hist_data.items()}
+        return hv.HoloMap(frames, kdims=["c"], group="Bemd_hists").opts(*self.hist_opts)
+
+    @property
+    def Bepis_hists(self) -> hv.HoloMap:
+        frames = {c: hv.Histogram(data, kdims=["Bepis"], label="Bepis")
+                  for c, data in self.Bepis_hist_data.items()}
+        return hv.HoloMap(frames, kdims=["c"], group="Bepis_hists").opts(*self.hist_opts)
 
     def _repr_mimebundle_(self, *args, **kwds):
-        return (self.prohibited_areas * self.discouraged_areas * self.calibration_curves)._repr_mimebundle_(*args, **kwds)
+        return self.scatters._repr_mimebundle_(*args, **kwds)
 
 
 # %%
@@ -88,10 +242,28 @@ def calibration_bins(calib_results: CalibrateResult,
 
 
 # %%
-def calibration_plot(calib_results: CalibrateResult,
-                     target_bin_size: Optional[int]=None
+def calibration_hists(calib_results: CalibrateResult,
+                      target_bin_size: Optional[int]=None
                     ) -> CalibrationPlotElements:
-    """Create a calibration plot from the results of calibration experiments.
+    """
+    Convert Calibration Results into the (Bemd, Bepis) pairs needed for
+    calibration plots.
+    Recall that on any one experiment, Bepis is either True or False. So to
+    estimate the probability P(E[R_A] < E[R_B] | Bemd), we histogram the data
+    points into equal-sized bins according to Bemd, then average the value of
+    Bepis within each bin. Representing each bin by its midpoint Bemd then
+    produces the desired list of (Bemd, Bepis) pairs.
+    Note that bins are equal in the number of experiments (and so have the
+    equal statistical power), rather than equal in width. The resulting points
+    are therefore not equally spaced along the Bemd axis, but will concentrate
+    in locations where there are more data.
+
+    When designing calibration experiments, it is important to ensure that there
+    are ambiguous cases which probe the middle of the calibration plot – the part
+    we actually care about. Otherwise we can end up with all points being
+    concentrated in the top right and bottom left corners: while this shows
+    a strong correlated, it does not actually tell us whether the probability
+    assigned by Bemd is any good, because only clear-cut cases were considered.
 
     Parameters
     ----------
@@ -107,36 +279,84 @@ def calibration_plot(calib_results: CalibrateResult,
        The default is to aim for the largest bin size possible which results
        in 16 curve points, with some limits in case the number of results is
        very small or very large.
-    """
 
-    ## Calibration curves ##
-    calib_curves = {}
-    calib_bins = {}
+    Returns
+    -------
+    curve_data: {c: [(Bemd, Bepis), ...]}
+        Dictionary where each entry is a list of data points defining a
+        calibration curve for a different c value.
+    experiment_ids: {c: [[int,...], ...]}
+        Lists of experiment indices used in each Bemd bin.
+    """
+    ## 
+    curve_data = {}
+    experiment_idcs = {}
     for c, data in calib_results.items():
         # # We don’t do the following because it uses the Bepis data to break ties.
         # # If there are a lot equal values (typically happens with a too small c),
         # # then those will get sorted and we get an artificial jump from 0 to 1
         # data.sort(order="Bemd")
         σ = np.argsort(data["Bemd"])  # This will only use Bemd data; order within ties remains random
-        Bemd = data["Bemd"][σ]    # NB: Don’t modify original data order: 
-        Bepis = data["Bepis"][σ]  #     we may want to inspect it later.
+        Bemd = data["Bemd"][σ]        # NB: Don’t modify original data order: 
+        Bepis = data["Bepis"][σ]      #     we may want to inspect it later.
 
-        curve_data = []
+        curve_points = []
         bin_idcs = []
         i = 0
         for w in utils.get_bin_sizes(len(data), target_bin_size):
-            curve_data.append((Bemd[i:i+w].mean(),
-                               Bepis[i:i+w].mean()))
+            curve_points.append((Bemd[i:i+w].mean(),
+                                 Bepis[i:i+w].mean()))
             bin_idcs.append(σ[i:i+w])
             i += w
+        curve_data[c] = curve_points
+        experiment_idcs[c] = bin_idcs
 
-        curve = hv.Curve(curve_data, kdims="Bemd", vdims="Bepis", label=f"{c=}")
+    return curve_data, experiment_idcs
+
+# %%
+def calibration_plot(calib_results: CalibrateResult,
+                     target_bin_size: Optional[int]=None
+                    ) -> CalibrationPlotElements:
+    """Create a calibration plot from the results of calibration experiments.
+    Calls `calibration_hists` to compute the plot data
+
+    Parameters
+    ----------
+    calib_results: The calibration results to plot. The typical way to obtain
+       these is to create and run `Calibrate` task:
+       >>> task = emdcmp.tasks.Calibrate(...)
+       >>> calib_results = task.unpack_results(task.run())
+    target_bin_size: Each point on the calibration curve is an average over
+       some number of calibration experiments; this parameter sets that number.
+       (The actual number may vary a bit, if `target_bin_size` does not exactly
+       divide the total number of samples.)
+       Larger bin sizes result in fewer but more accurate curve points.
+       The default is to aim for the largest bin size possible which results
+       in 16 curve points, with some limits in case the number of results is
+       very small or very large.
+
+    See also
+    --------
+    - `calibration_hists`
+    """
+
+    ## Calibration curves ##
+    curve_data, experiment_idcs = calibration_hists(calib_results, target_bin_size)
+
+    calib_curves = {}
+    for c, points in curve_data.items():
+        curve = hv.Curve(points, kdims="Bemd", vdims="Bepis", label=f"{c=}")
         curve = curve.redim.range(Bemd=(0,1), Bepis=(0,1))
-        curve.opts(hv.opts.Curve(**config.viz.calibration_curves))
+        # curve.opts(hv.opts.Curve(**config.viz.calibration_curves))
         calib_curves[c] = curve
-        calib_bins[c] = bin_idcs
-
     calib_hmap = hv.HoloMap(calib_curves, kdims=["c"])
+
+    ## Precompute histograms, so that we can have .*_hist methods to CalibratePlotElements ##
+    Bemd_hists = {}
+    Bepis_hists = {}
+    for c, res in calib_results.items():
+        Bemd_hists[c]  = np.histogram(res["Bemd"],              bins="auto", density=False)
+        Bepis_hists[c] = np.histogram(res["Bepis"].astype(int), bins="auto", density=False)
 
     ## Prohibited & discouraged areas ##
     # Prohibited area
@@ -156,12 +376,12 @@ def calibration_plot(calib_results: CalibrateResult,
     discouraged_area_1 = discouraged_area_1.redim.range(Bemd=(0,1), Bepis=(0,1))
     discouraged_area_2 = discouraged_area_2.redim.range(Bemd=(0,1), Bepis=(0,1))
 
-    prohibited_areas.opts(hv.opts.Area(**config.viz.prohibited_area))
-    discouraged_area_1.opts(hv.opts.Area(**config.viz.discouraged_area))
-    discouraged_area_2.opts(hv.opts.Area(**config.viz.discouraged_area))
+    # prohibited_areas.opts(hv.opts.Area(**config.viz.prohibited_area))
+    # discouraged_area_1.opts(hv.opts.Area(**config.viz.discouraged_area))
+    # discouraged_area_2.opts(hv.opts.Area(**config.viz.discouraged_area))
 
     ## Combine & return ##
     return CalibrationPlotElements(
         calib_hmap, prohibited_areas, discouraged_area_1*discouraged_area_2,
-        calib_bins)
+        experiment_idcs, Bemd_hists, Bepis_hists)
 
