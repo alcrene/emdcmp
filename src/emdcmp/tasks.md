@@ -215,11 +215,11 @@ The value of $N$ is determined from `len(models)`, so the `models` iterable shou
 
 The total number of experiments will be
 ```{math}
-N \times \lvert\mathtt{c\_list}\rvert \times \text{(\# parameter set distributions)} \,.
+N \times \lvert\mathtt{c\_list}\rvert \times \text{(# parameter set distributions)} \,.
 ```
 In the best scenario, one can expect compute times to be 2.5 minutes / experiment.[^how-to-make-faster] So expect this to take a few hours.
 
-Results are cached on-disk with [joblib.Memory](https://joblib.readthedocs.io/en/latest/memory.html), so code containing calibration experiments can be reexecuted without needing to re-run the experiments. Loading from disk takes about 1 minute for 6000 experiments.
+Results are cached on-disk with [joblib.Memory](https://joblib.readthedocs.io/en/latest/memory.html), so code containing calibration experiments can be reexecuted without needing to re-run the experiments. Loading from local SSD disk takes about 1 minute for 6000 experiments.
 
 [^how-to-make-faster]: This could be improved with better optimized implementation of the [hierarchical beta sampling process](code_path-sampling_hierarchical-beta).
 
@@ -235,8 +235,9 @@ Changing any argument other than `c_list` will invalidate all caches and force a
 +++ {"editable": true, "slideshow": {"slide_type": ""}}
 
 **Current limitations**
-- `ncores` depends on `config.mp.max_cores`, but is determined automatically.
-  No way to control via parameter.
+- There is no way to set `ncores` directly; to control the number of cores,
+  use the configuration option `config.mp.max_cores`.
+  `ncores` will be set to the minimum between `max_cores` and the maximum number allowed by the machine.
 
 +++ {"editable": true, "slideshow": {"slide_type": ""}}
 

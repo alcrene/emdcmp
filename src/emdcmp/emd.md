@@ -380,8 +380,8 @@ def draw_R_samples(mixed_risk_ppf: Callable,
     c: Proportionality constant between EMD and path sampling variance.
     res: Controls the resolution of the random quantile paths generated to compute statistics.
        Paths have ``2**res`` segments; typical values of `res` are 6, 7 and 8, corresponding
-       to paths of length 64, 128 and 256. Smaller may be useful to accelerate debugging,
-       but larger values are unlikely to be useful.
+       to paths of length 64, 128 and 256. Smaller may be useful to accelerate debugging.
+       Larger values may be needed in cases where the PPFs are unusually sharp.
     M: The minimum number of paths over which to average.
        Actual number may be more, to achieve the specified standard error.
     max_M: The maximum number of paths over which to average.
@@ -766,8 +766,8 @@ def Bemd(mixed_risk_ppfA: Callable, mixed_risk_ppfB: Callable,
     c: Proportionality constant between EMD and path sampling variance.
     res: Controls the resolution of the random quantile paths generated to compute statistics.
        Paths have length ``2**res + 1``; typical values of `res` are 6, 7 and 8, corresponding
-       to paths of length 64, 128 and 256. Smaller may be useful to accelerate debugging,
-       but larger values are unlikely to be useful.
+       to paths of length 64, 128 and 256. Smaller may be useful to accelerate debugging.
+       Larger values may be needed in cases where the PPFs are unusually sharp.
     M: The minimum number of paths over which to average.
        Actual number may be more, to achieve the specified standard error.
     max_M: The maximum number of paths over which to average.
