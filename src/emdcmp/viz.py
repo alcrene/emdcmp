@@ -113,6 +113,12 @@ class CalibrationPlotElements:
 
     ## Plotting functions ##
 
+    # NB: Using cached_properties allows to overwrite colours on a per-object basis
+    @cached_property
+    def scatter_palette(self): return config.viz.calibration_curves["color"]
+    @cached_property
+    def curve_palette(self): return config.viz.calibration_curves["color"]
+
     @property
     def opts(self):
         return (
@@ -123,7 +129,7 @@ class CalibrationPlotElements:
     @property
     def scatter_opts(self):
         scatter_opts = [hv.opts.Curve(color="#888888"),
-                        hv.opts.Scatter(color=config.viz.calibration_curves["color"])
+                        hv.opts.Scatter(color=self.scatter_palette)
                         ]
         if "matplotlib" in hv.Store.renderers:
             scatter_opts += [hv.opts.Curve(linestyle="dotted", linewidth=1, backend="matplotlib"),
@@ -138,13 +144,13 @@ class CalibrationPlotElements:
             hist_opts.append(
                 hv.opts.Histogram(backend="bokeh",
                     line_color=None, alpha=0.75,
-                    color=config.viz.calibration_curves["color"])
+                    color=self.curve_palette)
                 )
         if "bokeh" in hv.Store.renderers:
             hist_opts.append(
                 hv.opts.Histogram(backend="matplotlib",
                     color="none", edgecolor="none", alpha=0.75,
-                    facecolor=config.viz.calibration_curves["color"])
+                    facecolor=self.curve_palette)
                 )
         return hist_opts
 
