@@ -157,7 +157,9 @@ class CalibrationPlotElements:
         # It must be applied to the Curves themselves; cloning their containing HoloMap is not sufficient
         return hv.HoloMap({c: self.prohibited_areas * self.discouraged_areas
                               * curve.clone()
-                           for c, curve in self.calibration_curves.items()}
+                           for c, curve in self.calibration_curves.items()},
+                           kdims=["c"],
+                           sort=False  # Keep the same order as calibration_curves, to ensure consistent legends
                ).opts(*self.opts)
 
     @property
@@ -187,9 +189,11 @@ class CalibrationPlotElements:
         """
         scatters = {c: curve.to.scatter() for c, curve in self.calibration_curves.items()}
         return hv.HoloMap({c: self.prohibited_areas * self.discouraged_areas
-                              * self.calibration_curves[c].clone() * scatters[c]
+                              * self.calibration_curves[c].clone().relabel(label="")  # Remove labels on curves so the legend uses scatter
+                              * scatters[c]
                            for c in scatters},
-                          kdims=["c"]
+                          kdims=["c"],
+                          sort=False  # Keep the same order as calibration_curves, to ensure consistent legends
                ).opts(*self.opts).opts(scatter_opts)
     @property
     def overlayed_scatters(self) -> hv.Overlay:
@@ -199,7 +203,8 @@ class CalibrationPlotElements:
         """
         scatters = {c: curve.to.scatter() for c, curve in self.calibration_curves.items()}
         return (self.prohibited_areas * self.discouraged_areas
-                * hv.Overlay([curve.clone() for curve in self.calibration_curves.values()])
+                * hv.Overlay([curve.clone().relabel(label="")  # Remove labels on lines so the legend uses scatter labels (lines all have the same colour, so a legend of lines is no good)
+                              for curve in self.calibration_curves.values()])
                 * hv.Overlay(list(scatters.values()))
                 ).opts(*self.opts).opts(scatter_opts)
 
