@@ -111,6 +111,59 @@ class CalibrationPlotElements:
     Bepis_hist_data: Dict[float,Tuple[np.ndarray[int], np.ndarray[float]]]
     experiment_idcs: Dict[float,List[np.ndarray[int]]]
 
+    ## Expose certain methods so that contained elements can be operated on as a block
+
+    def select(self, selection_specs=None, **kwargs) -> "CalibrationPlotElements":
+        """
+        Create a new `CalibrationPlotElements` after applying `select` to the calibration curves.
+        This is a convenient way of reducing the set of plotted curves.
+
+        Note
+        ----
+        Other plot elements (the shaded areas) are not cloned, and thus will
+        share options and dimensions with the originals.
+        """
+        return CalibrationPlotElements(
+            calibration_curves = self.calibration_curves.select(selection_specs, **kwargs),
+            prohibited_areas = self.prohibited_areas,
+            discouraged_areas = self.discouraged_areas,
+            bin_idcs = self.bin_idcs,
+            Bemd_hist_data = self.Bemd_hist_data,
+            Bepis_hist_data = self.Bepis_hist_data
+        )
+
+    def clone(self, shared_data=True, link=True) -> "CalibrationPlotElements":
+        """
+        Create a new `CalibrationPlotElements` by cloning all the contained elements.
+        Arguments are passed down to all `.clone()` calls
+
+        Note
+        ----
+        Only `shared_data` and `link` arguments are supported, since other
+        arguments don’t make sense for a batch operation.
+        """
+        return CalibrationPlotElements(
+            calibration_curves = self.calibration_curves.clone(shared_data=shared_data, link=link),
+            prohibited_areas = self.prohibited_areas.clone(shared_data=shared_data, link=link),
+            discouraged_areas = self.discouraged_areas.clone(shared_data=shared_data, link=link),
+            bin_idcs = self.bin_idcs,
+            Bemd_hist_data = self.Bemd_hist_data,
+            Bepis_hist_data = self.Bepis_hist_data
+        )
+
+    def redim(self, **kwargs) -> "CalibrationPlotElements":
+        """
+        Create a new `CalibrationPlotElements` by calling `redim` all the contained elements.
+        """
+        return CalibrationPlotElements(
+            calibration_curves = self.calibration_curves.redim(**kwargs),
+            prohibited_areas = self.prohibited_areas.redim(**kwargs),
+            discouraged_areas = self.discouraged_areas.redim(**kwargs),
+            bin_idcs = self.bin_idcs,
+            Bemd_hist_data = self.Bemd_hist_data,
+            Bepis_hist_data = self.Bepis_hist_data
+        )
+
     ## Plotting functions ##
 
     # NB: Using cached_properties allows to overwrite colours on a per-object basis
