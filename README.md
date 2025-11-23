@@ -1,7 +1,7 @@
 # EMD model comparison library
 
 The EMD (empirical model discrepancy) is a method for comparing models based both on their expected risk, and the uncertainty of that risk across experiments.
-It is described in [this publication](); it’s main features are:
+It is described in [this publication](https://alcrene.github.io/emd-paper); it’s main features are:
 - **Symmetric**: All models are treated the same. (There is no preferred null model.)
   A corollary is that the test works for any number of models.
 - **Specific**: Models are compared for particular parameter sets. In particular, the different models may all be the same equations but with different parameters.
