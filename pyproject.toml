@@ -73,7 +73,7 @@ doc = [
     "holoviews",
     "addict",
 
-    "jupyter-book>=0.14",
+    "jupyter-book >=0.14, <2",
     "sphinx-proof",
     "jupytext",
     "ipykernel",
