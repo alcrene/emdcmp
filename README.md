@@ -49,7 +49,11 @@ Bemd(mixed_ppfA, mixed_ppfB, synth_ppfA, synth_ppfB, c=c)
 ```
 
 The function `Bemd` returns a float corresponding to the tail probability
-$$B^{\mathrm{EMD}}_{AB} = P(R_A < R_B \mid c) \,.$$
+%
+$$
+B^{\mathrm{EMD}}_{AB} = P(R_A < R_B \mid c) \,.
+$$
+%
 This is the probability that the [expected risk](https://en.wikipedia.org/wiki/Statistical_learning_theory#Formal_description) (aka the expected loss) of model $A$ is less than that of model $B$, _across replications of the experiment_. The fundamental assumption underlying EMD is this:
 
 > Discrepancies between model predictions and observed data are due to uncontrolled experimental factors. Those factors may change across replications.

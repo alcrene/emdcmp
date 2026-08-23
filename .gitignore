@@ -4,7 +4,16 @@ build
 *.jupyter
 *.jupyter_cache
 
+_build/
+
+*.egg-info
+__pycache__
+
+.ipynb_checkpoints
+
 purgatory
 _version.py
-emdcmp/*.md
-test/*.txt
+/src/emdcmp/*.md
+/test/*.txt
+
+/src/emdcmp/timing_cache_*
